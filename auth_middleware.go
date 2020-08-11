@@ -73,6 +73,6 @@ func GetSession(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"status": "Signed in!", "user": u, "group": g})
+	c.JSON(200, gin.H{"status": "Signed in!", "user": u, "group": g, "user_group": u.GroupId.Hex()})
 
 }

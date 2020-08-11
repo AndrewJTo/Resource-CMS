@@ -23,20 +23,21 @@ type Login struct {
 type NewUser struct {
 	Email     string `json:"email_address,omitempty"`
 	Password  string `json:"Password,omitempty"`
-	OldPass   string `json:"password_old,omitempty"`
-	OldEmail  string `json:"email_address_old"`
+	OldPass   string `json:"password_old,omitempty"` //Only for acc changes
+	OldEmail  string `json:"email_address_old"`      //Only for acc changes
 	FirstName string `json:"first_name,omitempty"`
 	LastName  string `json:"last_name,omitempty"`
 	GroupId   string `json:"group_id,omitempty"`
 }
 
 type Group struct {
-	Name       string `json:"group_name" bson:"group_name"`
-	WriteRes   bool   `json:"write_resources" bson:"write_resources"`
-	WritePages bool   `json:"write_pages" bson:"write_pages"`
-	UserAdmin  bool   `json:"user_admin" bson:"user_admin"`
-	SiteAdmin  bool   `json:"site_admin" bson:"site_admin"`
-	Sudo       bool   `json:"sudo" bson:"sudo"`
+	Id         primitive.ObjectID `json:"-" bson:"_id"`
+	Name       string             `json:"group_name" bson:"group_name"`
+	WriteRes   bool               `json:"write_resources" bson:"write_resources"`
+	WritePages bool               `json:"write_pages" bson:"write_pages"`
+	UserAdmin  bool               `json:"user_admin" bson:"user_admin"`
+	SiteAdmin  bool               `json:"site_admin" bson:"site_admin"`
+	Sudo       bool               `json:"sudo" bson:"sudo"`
 }
 
 type LoginDetails struct {

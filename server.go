@@ -71,6 +71,8 @@ func (s *Server) init() {
 		auth.PUT("/sidebar", s.SetSideBarRoute)
 		auth.GET("/pages", s.ListPages)
 		auth.PUT("/pages", s.AddPage)
+		auth.POST("/pages/:title", s.EditPage)
+		auth.GET("/pages/:title", s.GetPage)
 	}
 
 	s.router.GET("/", func(c *gin.Context) {
@@ -100,8 +102,8 @@ func firstTimeSetup(s *Server) {
 	log.Println("Doing first time setup...")
 
 	//Create groups
-	users := stru.Group{"user", false, false, false, false, false}
-	admins := stru.Group{"admin", true, true, true, true, false}
+	users := stru.Group{primitive.NewObjectID(), "user", false, false, false, false, false}
+	admins := stru.Group{primitive.NewObjectID(), "admin", true, true, true, true, false}
 
 	opts := options.InsertMany().SetOrdered(true)
 	res, err := s.db.Collection("groups").InsertMany(context.Background(), []interface{}{users, admins}, opts)

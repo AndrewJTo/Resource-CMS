@@ -11,6 +11,7 @@ type Page struct {
 }
 
 type Permissions struct {
+	AllUsersView  bool                 `json:"all_users_view" bson:"all_users_view"`
 	ViewGroupIds  []primitive.ObjectID `json:"view_groups" bson:"view_groups"`
 	EditGroupsIds []primitive.ObjectID `json:"edit_groups" bson:"edit_groups"`
 }
