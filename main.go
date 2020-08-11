@@ -3,49 +3,86 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 	"os"
-	"time"
+	"fmt"
+	"encoding/gob"
 
-	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/gin-contrib/sessions/redis"
+
+	stru "github.com/AndrewJTo/Resource-CMS/structures"
 )
+
+func init() {
+	gob.Register(&stru.User{})
+	gob.Register(&stru.Group{})
+}
 
 func main() {
 
 	port := os.Getenv("PORT")
-	mongourl := os.Gentenv("DATABASE_URL")
+	mongourl := os.Getenv("MONGODB_URI")
+	redisUrl := os.Getenv("REDIS_URL")
 
 	if port == "" {
 		log.Fatal("$PORT must be set")
 	}
 
 	if mongourl == "" {
-		log.Fatal("$MONGOURL must be set")
+		log.Fatal("$MONGODB_URI must be set")
 	}
 
-	clientOptions := options.Client().ApplyURI("mongodb://" + mongourl)
-	client, err := mongo.Connect(context.TODO(), clientOptions)
+	if redisUrl == "" {
+		log.Fatal("$REDIS_URL must be set")
+	}
+
+	s := Server{}
+
+	clientOptions := options.Client().ApplyURI(mongourl)
+	dbClient, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
-	err = client.Ping(context.TODO(), nil)
+	err = dbClient.Ping(context.TODO(), nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
-	fmt.Println("Connected to MongoDB!")
+	log.Println("Connected to MongoDB!")
+	s.db = dbClient.Database("resourcesys_db")
 
-	router := gin.New()
-	router.Use(gin.Logger())
-	router.LoadHTMLGlob("templates/*.tmpl")
-	router.Static("/Static", "static")
-	router.Static("/gojs", "gojs")
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String("eu-west-2")},
+		)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 
-	router.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "home.tmpl", nil)
-	})
+	svc := s3.New(sess)
+	result, err := svc.ListBuckets(nil)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	fmt.Println("Buckets:")
+	for _, b := range result.Buckets {
+		fmt.Printf("* %s created on %s\n", aws.StringValue(b.Name), aws.TimeValue(b.CreationDate))
+	}
 
-	router.Run(":" + port)
+	redisStore, err := redis.NewStore(10, "tcp", redisUrl, "", []byte("secret"))
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	log.Println("Redis store created!")
+
+	if isFirstTime(&s){
+		firstTimeSetup(&s)
+	}
+
+	s.store = redisStore
+	s.port = port
+	s.init()
 }
