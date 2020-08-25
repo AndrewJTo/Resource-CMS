@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"log"
 	"net/http"
 
 	"github.com/gin-contrib/sessions"
@@ -9,7 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	stru "github.com/AndrewJTo/Resource-CMS/structures"
-	"github.com/AndrewJTo/Resource-CMS/util"
+	//"github.com/AndrewJTo/Resource-CMS/util"
 )
 
 func (s *Server) GetUserInfo(c *gin.Context) {
@@ -30,7 +32,23 @@ func (s *Server) GetUserInfo(c *gin.Context) {
 			return
 		}
 
-		c.JSON(200, gin.H{"user": u})
+		login, err := s.GetUserLogin(u.Id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "Could not find login!"})
+			return
+		}
+
+		group, err := s.GetGroup(u.GroupId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"status": "Group not found!"})
+			return
+		}
+
+		//No idea why this only works here
+		u.HexId = u.Id.Hex()
+		group.HexId = group.Id.Hex()
+
+		c.JSON(200, gin.H{"user": u, "email": login.Email, "group": group})
 
 	} else {
 		id, err := primitive.ObjectIDFromHex(c.Param("id"))
@@ -50,7 +68,21 @@ func (s *Server) GetUserInfo(c *gin.Context) {
 		group, _ := GetSessionGroup(c)
 
 		if u.Id == user.Id || group.UserAdmin {
-			c.JSON(200, gin.H{"user": u})
+			login, err := s.GetUserLogin(u.Id)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"status": "Could not find login!"})
+				return
+			}
+			group, err := s.GetGroup(u.GroupId)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"status": "Group not found!"})
+				return
+			}
+			//No idea why this only works here
+			u.HexId = u.Id.Hex()
+			group.HexId = group.Id.Hex()
+
+			c.JSON(200, gin.H{"user": u, "email": login.Email, "group": group})
 			return
 		}
 		c.JSON(401, gin.H{"msg": "You do not have permission"})
@@ -65,6 +97,31 @@ func (s *Server) ListUsers(c *gin.Context) {
 		return
 	}
 
+	cur, err := s.db.Collection("users").Find(context.Background(), bson.M{})
+
+	var users []stru.User
+
+	if err != nil {
+		log.Fatal("Could not find pages")
+	}
+
+	for cur.Next(context.Background()) {
+		user := stru.User{}
+
+		err := cur.Decode(&user)
+
+		if err != nil {
+			log.Fatal("Could not decode page!")
+		}
+
+		user.HexId = user.Id.Hex()
+
+		users = append(users, user)
+	}
+
+	c.JSON(200, users)
+
+	/* Implement this later
 	nxt := util.GetNext(c)
 	no := util.GetPageSize(c)
 
@@ -98,4 +155,5 @@ func (s *Server) ListUsers(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"next_id": last.Hex(), "users": users})
+	*/
 }

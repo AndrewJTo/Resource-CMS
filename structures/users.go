@@ -22,7 +22,7 @@ type Login struct {
 
 type NewUser struct {
 	Email     string `json:"email_address,omitempty"`
-	Password  string `json:"Password,omitempty"`
+	Password  string `json:"password,omitempty"`
 	OldPass   string `json:"password_old,omitempty"` //Only for acc changes
 	OldEmail  string `json:"email_address_old"`      //Only for acc changes
 	FirstName string `json:"first_name,omitempty"`
@@ -32,6 +32,7 @@ type NewUser struct {
 
 type Group struct {
 	Id         primitive.ObjectID `json:"-" bson:"_id"`
+	HexId      string             `json:"id" bson:"-"`
 	Name       string             `json:"group_name" bson:"group_name"`
 	WriteRes   bool               `json:"write_resources" bson:"write_resources"`
 	WritePages bool               `json:"write_pages" bson:"write_pages"`

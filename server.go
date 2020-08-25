@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/redis"
+	"github.com/gin-gonic/autotls"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -18,10 +19,13 @@ import (
 )
 
 type Server struct {
-	port   string
-	router *gin.Engine
-	db     *mongo.Database
-	store  redis.Store
+	domain   string
+	port     string
+	sec      bool
+	router   *gin.Engine
+	db       *mongo.Database
+	store    redis.Store
+	rootNode *stru.Node
 }
 
 func (s *Server) init() {
@@ -66,20 +70,33 @@ func (s *Server) init() {
 		auth.GET("/user/:id", s.GetUserInfo)
 		auth.POST("/user/:id", s.ChangeUser)
 		auth.PUT("/user/new", s.CreateUser)
-		auth.GET("/sidebar", s.GetSideBarRoute)
-		auth.POST("/sidebar", s.AddNewSideBarLink)
-		auth.PUT("/sidebar", s.SetSideBarRoute)
+		auth.GET("/site/sidebar", s.GetSideBarRoute)
+		auth.POST("/site/sidebar", s.AddNewSideBarLink)
+		auth.PUT("/site/sidebar", s.SetSideBarRoute)
 		auth.GET("/pages", s.ListPages)
 		auth.PUT("/pages", s.AddPage)
 		auth.POST("/pages/:title", s.EditPage)
+		auth.DELETE("/pages/:title", s.RemovePage)
 		auth.GET("/pages/:title", s.GetPage)
+		auth.GET("/groups", s.ListGroups)
+		auth.GET("/files/:path", s.NodePathGet)
+		auth.GET("/links", s.ListLinks)
+		auth.GET("/links/:id", s.GetLink)
+		auth.POST("/links/:id", s.UpdateLink)
+		auth.DELETE("/links/:id", s.RemoveLink)
+		auth.PUT("/links", s.AddNewLink)
+
 	}
 
 	s.router.GET("/", func(c *gin.Context) {
 		c.HTML(200, "home.tmpl", nil)
 	})
 
-	s.router.Run(":" + s.port)
+	if s.sec {
+		log.Fatal(autotls.Run(s.router, s.domain))
+	} else {
+		s.router.Run(":" + s.port)
+	}
 }
 
 func isFirstTime(s *Server) bool {
@@ -102,8 +119,8 @@ func firstTimeSetup(s *Server) {
 	log.Println("Doing first time setup...")
 
 	//Create groups
-	users := stru.Group{primitive.NewObjectID(), "user", false, false, false, false, false}
-	admins := stru.Group{primitive.NewObjectID(), "admin", true, true, true, true, false}
+	users := stru.Group{primitive.NewObjectID(), "", "user", false, false, false, false, false}
+	admins := stru.Group{primitive.NewObjectID(), "", "admin", true, true, true, true, false}
 
 	opts := options.InsertMany().SetOrdered(true)
 	res, err := s.db.Collection("groups").InsertMany(context.Background(), []interface{}{users, admins}, opts)

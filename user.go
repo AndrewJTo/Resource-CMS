@@ -2,13 +2,12 @@ package main
 
 import (
 	"context"
-	"log"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
+	"log"
+	"time"
 
 	stru "github.com/AndrewJTo/Resource-CMS/structures"
 )
@@ -21,34 +20,39 @@ func (s *Server) ChangeUser(c *gin.Context) {
 	user, _ := GetSessionUser(c)
 	if c.Param("id") == "me" || c.Param("id") == user.HexId {
 		targetID = user.Id
+		group, _ := GetSessionGroup(c)
+		if group.UserAdmin {
+			authed = true
+		}
 	} else {
 		group, _ := GetSessionGroup(c)
 		if !group.UserAdmin {
-			c.JSON(401, gin.H{"msg": "Must be admin to change other users"})
+			c.JSON(401, gin.H{"success": false, "msg": "Must be admin to change other users"})
 			return
 		}
 		authed = true
+		var err error
+		targetID, err = primitive.ObjectIDFromHex(c.Param("id"))
 
-	}
-	targetID, err := primitive.ObjectIDFromHex(c.Param("id"))
+		if err != nil {
+			c.JSON(400, gin.H{"success": false, "msg": "There is a problem with the provided userID!"})
+			return
+		}
 
-	if err != nil {
-		c.JSON(400, gin.H{"msg": "There is a problem with the provided userID!"})
-		return
 	}
 
 	var ch stru.NewUser
-	err = c.ShouldBindJSON(&ch)
+	err := c.ShouldBindJSON(&ch)
 
 	if !authed {
 		u, err := s.login(ch.OldEmail, ch.OldPass)
 		if err != nil {
-			c.JSON(400, err.Error())
+			c.JSON(400, gin.H{"success": false, "msg": "Login Error" + err.Error()})
 			return
 		}
 
 		if u.Id != targetID {
-			c.JSON(402, gin.H{"msg": "Incorrect login details!"})
+			c.JSON(402, gin.H{"success": false, "msg": "Incorrect login details!"})
 			return
 		}
 		authed = true
@@ -60,7 +64,7 @@ func (s *Server) ChangeUser(c *gin.Context) {
 		filter := bson.M{"email_address": ch.Email}
 		no, _ := s.db.Collection("logins").CountDocuments(context.Background(), filter)
 		if no != 0 {
-			c.JSON(400, gin.H{"msg": "Email address already associated with an account!"})
+			c.JSON(400, gin.H{"success": false, "msg": "Email address already associated with an account!"})
 			return
 		}
 		//Chnage email
@@ -74,7 +78,8 @@ func (s *Server) ChangeUser(c *gin.Context) {
 	if ch.Password != "" {
 		hash, err := bcrypt.GenerateFromPassword([]byte(ch.Password), bcrypt.DefaultCost)
 		if err != nil {
-			log.Fatal("Error:" + err.Error())
+			c.JSON(402, gin.H{"success": false, "msg": err.Error()})
+			return
 		}
 		filter := bson.M{"userid": targetID}
 		update := bson.D{{"$set", bson.D{{"hash", hash}}}}
@@ -102,7 +107,7 @@ func (s *Server) ChangeUser(c *gin.Context) {
 	if ch.GroupId != "" {
 		//TODO: Need to check id is valid first
 		if err != nil {
-			c.JSON(501, gin.H{"msg": "Group chaning not implemented !"})
+			c.JSON(501, gin.H{"success": false, "msg": "Group chaning not implemented !"})
 			return
 		}
 		/*
@@ -119,7 +124,7 @@ func (s *Server) ChangeUser(c *gin.Context) {
 	}
 
 	//Done
-	c.JSON(200, gin.H{"msg": "Updated Account", "changed": gin.H{"email": chEmail, "password": chPass, "first_name": chFName, "last_name": chLName, "group": chGroup}})
+	c.JSON(200, gin.H{"success": true, "msg": "Updated Account", "changed": gin.H{"email": chEmail, "password": chPass, "first_name": chFName, "last_name": chLName, "group": chGroup}})
 }
 
 func (s *Server) CreateUser(c *gin.Context) {
@@ -202,6 +207,16 @@ func (s *Server) GetUser(id primitive.ObjectID) (stru.User, error) {
 	var user stru.User
 	filter := bson.M{"_id": id}
 	err := s.db.Collection("users").FindOne(context.Background(), filter).Decode(&user)
+	if err != nil {
+		user.HexId = user.Id.Hex()
+	}
 
 	return user, err
+}
+
+func (s *Server) GetUserLogin(userId primitive.ObjectID) (stru.Login, error) {
+	var login stru.Login
+	filter := bson.M{"userid": userId}
+	err := s.db.Collection("logins").FindOne(context.Background(), filter).Decode(&login)
+	return login, err
 }

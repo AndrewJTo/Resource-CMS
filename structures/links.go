@@ -6,18 +6,20 @@ import (
 
 type Link struct {
 	Location string `json:"location" bson:"location"`
-	Title    string `json:"text" bson:"text"`
+	Text     string `json:"text" bson:"text"`
 }
 
 type SideBar struct {
-	Id    primitive.ObjectID `json:"-" bson:"_id"`
+	//Id    primitive.ObjectID `json:"-" bson:"_id"`
 	Title string
 	Links []Link
+	Key   string
 }
 
-type SiteLogin struct {
-	Id       primitive.ObjectID `json:"id" bson:"_id"`
-	Link     Link
-	Username string
-	Password string
+type LinkLogon struct {
+	Id       primitive.ObjectID `json:"-" bson:"_id"`
+	HexId    string             `json:"id" bson:"-"`
+	Link     Link               `json:link`
+	Username string             `json:"username"`
+	Password string             `json:"password"`
 }

@@ -1,13 +1,13 @@
 package main
 
-import(
-	"net/http"
-	"log"
+import (
 	"context"
 	"errors"
+	"log"
+	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
 
 	stru "github.com/AndrewJTo/Resource-CMS/structures"
 	"go.mongodb.org/mongo-driver/bson"
@@ -15,10 +15,10 @@ import(
 	"golang.org/x/crypto/bcrypt"
 )
 
-func logout (c *gin.Context) {
+func logout(c *gin.Context) {
 
 	if !LoggedIn(c) {
-		c.JSON(401, gin.H{"Error": true, "msg":"Not logged in!!"})
+		c.JSON(401, gin.H{"Error": true, "msg": "Not logged in!!"})
 		return
 	}
 
@@ -26,10 +26,10 @@ func logout (c *gin.Context) {
 	session.Clear()
 	session.Save()
 
-	c.JSON(http.StatusOK, gin.H{"logout": true, "msg":"Logged out, bye!"})
+	c.JSON(http.StatusOK, gin.H{"logout": true, "msg": "Logged out, bye!"})
 }
 
-func (s *Server) login (email, password string) (stru.User, error) {
+func (s *Server) login(email, password string) (stru.User, error) {
 	//Find user
 	var result stru.Login
 
@@ -63,14 +63,14 @@ func (s *Server) login (email, password string) (stru.User, error) {
 	return user, nil
 }
 
-func (s *Server) loginRoute (c *gin.Context) {
+func (s *Server) loginRoute(c *gin.Context) {
 	var details stru.LoginDetails
 
 	err := c.ShouldBindJSON(&details)
 
 	if err != nil {
 		//TODO: the message isn't very helpful most the time
-		c.JSON(http.StatusBadRequest, gin.H{"login": false, "msg": err.Error()})
+		c.JSON(402, gin.H{"login": false, "msg": err.Error()})
 		return
 	}
 
@@ -86,7 +86,7 @@ func (s *Server) loginRoute (c *gin.Context) {
 	user, err := s.login(details.Email, details.Password)
 
 	if err != nil {
-		c.JSON(402, gin.H{"login":false, "msg":err.Error()})
+		c.JSON(402, gin.H{"login": false, "msg": err.Error()})
 		return
 	}
 
@@ -103,12 +103,12 @@ func (s *Server) loginRoute (c *gin.Context) {
 	//Set session
 	session := sessions.Default(c)
 	session.Set("user", user)
-	session.Set("group", group)	//This might not be a good idea
+	session.Set("group", group) //This might not be a good idea
 	err = session.Save()
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"status": "Session store error!"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"login": true, "user": user, "group": group,})
+	c.JSON(http.StatusOK, gin.H{"login": true, "user": user, "group": group})
 }

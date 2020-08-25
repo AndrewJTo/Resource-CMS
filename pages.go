@@ -10,6 +10,18 @@ import (
 	"net/http"
 )
 
+func (s *Server) RemovePage(c *gin.Context) {
+	title := c.Param("title")
+	filter := bson.D{{"page_title", primitive.Regex{Pattern: "^" + title + "$", Options: "i"}}}
+	_, err := s.db.Collection("pages").DeleteOne(context.Background(), filter)
+
+	if err != nil {
+		c.JSON(404, gin.H{"success": false, "msg": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "msg": "Page deleted!"})
+}
+
 func (s *Server) GetPage(c *gin.Context) {
 	title := c.Param("title")
 
@@ -67,14 +79,14 @@ func (s *Server) ListPages(c *gin.Context) {
 		pages = append(pages, page)
 	}
 
-	c.JSON(200, gin.H{"pages": pages})
+	c.JSON(200, pages)
 }
 
 func (s *Server) EditPage(c *gin.Context) {
 
 	group, _ := GetSessionGroup(c)
 	if !group.WritePages {
-		c.JSON(http.StatusForbidden, gin.H{"msg": "Must be admin to edit pages"})
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "msg": "Must be admin to edit pages"})
 		return
 	}
 
@@ -85,7 +97,7 @@ func (s *Server) EditPage(c *gin.Context) {
 	var page stru.Page
 	err := s.db.Collection("pages").FindOne(context.Background(), filter).Decode(&page)
 	if err != nil {
-		c.JSON(404, gin.H{"msg": "Page not found!"})
+		c.JSON(404, gin.H{"success": false, "msg": "Page not found!"})
 		return
 	}
 
@@ -94,7 +106,7 @@ func (s *Server) EditPage(c *gin.Context) {
 	err = c.ShouldBindJSON(&newPage)
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"msg": "Invallid data sent"})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "msg": "Invallid data sent"})
 		return
 	}
 
@@ -103,7 +115,7 @@ func (s *Server) EditPage(c *gin.Context) {
 		filter := bson.D{{"page_title", primitive.Regex{Pattern: "^" + newPage.Title + "$", Options: "i"}}}
 		no, _ := s.db.Collection("pages").CountDocuments(context.Background(), filter)
 		if no != 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"msg": "A page already has this title"})
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "msg": "A page already has this title"})
 			return
 		}
 	}
@@ -113,14 +125,14 @@ func (s *Server) EditPage(c *gin.Context) {
 	update := bson.D{{"$set", newPage}}
 	s.db.Collection("pages").FindOneAndUpdate(context.Background(), filter, update)
 
-	c.JSON(200, gin.H{"msg": "Page edited", "url": "/pages/" + newPage.Title})
+	c.JSON(200, gin.H{"success": true, "msg": "Page edited", "url": "/pages/" + newPage.Title})
 
 }
 
 func (s *Server) AddPage(c *gin.Context) {
 	group, _ := GetSessionGroup(c)
 	if !group.WritePages {
-		c.JSON(http.StatusForbidden, gin.H{"msg": "Must be admin to add pages"})
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "msg": "Must be admin to add pages"})
 		return
 	}
 
@@ -129,7 +141,7 @@ func (s *Server) AddPage(c *gin.Context) {
 	err := c.ShouldBindJSON(&newPage)
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"msg": "Invallid data sent"})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "msg": "Invallid data sent"})
 		return
 	}
 
@@ -137,7 +149,7 @@ func (s *Server) AddPage(c *gin.Context) {
 	filter := bson.D{{"page_title", primitive.Regex{Pattern: "^" + newPage.Title + "$", Options: "i"}}}
 	no, _ := s.db.Collection("pages").CountDocuments(context.Background(), filter)
 	if no != 0 {
-		c.JSON(400, gin.H{"msg": "A page already has this title!"})
+		c.JSON(400, gin.H{"success": false, "msg": "A page already has this title!"})
 		return
 	}
 
@@ -145,14 +157,14 @@ func (s *Server) AddPage(c *gin.Context) {
 	for _, gid := range newPage.Access.ViewGroupIds {
 		_, err := s.GetGroup(gid)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"msg": "View group not found", "id": gid.Hex()})
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "msg": "View group not found", "id": gid.Hex()})
 			return
 		}
 	}
 	for _, gid := range newPage.Access.EditGroupsIds {
 		_, err := s.GetGroup(gid)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"msg": "Edit group not found", "id": gid.Hex()})
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "msg": "Edit group not found", "id": gid.Hex()})
 			return
 		}
 	}
@@ -165,7 +177,7 @@ func (s *Server) AddPage(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, gin.H{"msg": "Page added"})
+	c.JSON(200, gin.H{"success": true, "msg": "Page added"})
 	return
 
 }

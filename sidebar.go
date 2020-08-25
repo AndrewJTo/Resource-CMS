@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
 	"net/http"
 
@@ -43,11 +42,12 @@ func (s *Server) SetSideBarRoute(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"msg": "Invallid data sent"})
 		return
 	}
+	sideBar.Key = "config"
 
 	err = s.setSideBar(sideBar)
 
 	if err != nil {
-		log.Fatal("Could not update sidebar")
+		log.Fatal("Could not update sidebar" + err.Error())
 		return
 	}
 
@@ -83,7 +83,7 @@ func (s *Server) AddNewSideBarLink(c *gin.Context) {
 	err = s.setSideBar(sideBar)
 
 	if err != nil {
-		log.Fatal("Could not update sidebar")
+		log.Fatal("Could not update sidebar" + err.Error())
 		return
 	}
 
@@ -92,7 +92,7 @@ func (s *Server) AddNewSideBarLink(c *gin.Context) {
 }
 
 func (s *Server) setSideBar(sideBar stru.SideBar) error {
-	filter := bson.M{"title": "main"}
+	filter := bson.M{"key": "config"}
 	update := bson.D{{"$set", sideBar}}
 	_, err := s.db.Collection("settings").UpdateOne(context.Background(), filter, update)
 
@@ -101,19 +101,18 @@ func (s *Server) setSideBar(sideBar stru.SideBar) error {
 
 func (s *Server) getSideBar() (stru.SideBar, error) {
 	var sideBar stru.SideBar
-	filter := bson.M{"title": "main"}
-	err := s.db.Collection("settings").FindOne(context.Background(), filter).Decode(&sideBar)
+	err := s.db.Collection("settings").FindOne(context.Background(), bson.M{"key": "config"}).Decode(&sideBar)
 
 	if err != nil {
-		log.Println("Could not find side bar")
+		log.Println("Could not find side bar" + err.Error())
 		return stru.SideBar{}, err
 	}
 	return sideBar, nil
 }
 
 func (s *Server) makeEmptySideBar() (stru.SideBar, error) {
-	var links []stru.Link
-	sideBar := stru.SideBar{Id: primitive.NewObjectID(), Title: "main", Links: links}
+	links := []stru.Link{stru.Link{Location: "/app/page/home", Text: "Home"}, stru.Link{Location: "/app/links", Text: "Links"}}
+	sideBar := stru.SideBar{Title: "main", Links: links, Key: "config"}
 
 	_, err := s.db.Collection("settings").InsertOne(context.Background(), sideBar)
 

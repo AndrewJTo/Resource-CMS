@@ -2,17 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/gob"
+	"fmt"
 	"log"
 	"os"
-	"fmt"
-	"encoding/gob"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-contrib/sessions/redis"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	stru "github.com/AndrewJTo/Resource-CMS/structures"
 )
@@ -27,6 +27,7 @@ func main() {
 	port := os.Getenv("PORT")
 	mongourl := os.Getenv("MONGODB_URI")
 	redisUrl := os.Getenv("REDIS_URL")
+	domain := os.Getenv("DOMAIN")
 
 	if port == "" {
 		log.Fatal("$PORT must be set")
@@ -41,6 +42,16 @@ func main() {
 	}
 
 	s := Server{}
+	if os.Getenv("SECURE") == "TRUE" {
+		s.sec = true
+		if domain == "" {
+			log.Fatal("$SECURE is set, provide $DOMAIN")
+		} else {
+			s.domain = domain
+		}
+	} else {
+		s.sec = false
+	}
 
 	clientOptions := options.Client().ApplyURI(mongourl)
 	dbClient, err := mongo.Connect(context.TODO(), clientOptions)
@@ -57,7 +68,7 @@ func main() {
 
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String("eu-west-2")},
-		)
+	)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -78,7 +89,7 @@ func main() {
 	}
 	log.Println("Redis store created!")
 
-	if isFirstTime(&s){
+	if isFirstTime(&s) {
 		firstTimeSetup(&s)
 	}
 
