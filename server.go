@@ -5,8 +5,10 @@ import (
 	"log"
 	"time"
 
+	stru "github.com/AndrewJTo/Resource-CMS/structures"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/redis"
+	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/autotls"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -14,8 +16,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/crypto/bcrypt"
-
-	stru "github.com/AndrewJTo/Resource-CMS/structures"
 )
 
 type Server struct {
@@ -34,10 +34,10 @@ func (s *Server) init() {
 
 	s.router.Use(gin.Logger())
 	s.router.Use(sessions.Sessions("ressys_sessions", s.store))
+	//s.router.Static("/", "static")
 
-	s.router.LoadHTMLGlob("templates/*.tmpl")
-	s.router.Static("/Static", "static")
-	s.router.Static("/gojs", "gojs")
+	s.router.Use(static.Serve("/", static.LocalFile("Static", false)))
+
 	s.router.POST("/api/login", s.loginRoute)
 
 	//Counter
@@ -85,12 +85,7 @@ func (s *Server) init() {
 		auth.POST("/links/:id", s.UpdateLink)
 		auth.DELETE("/links/:id", s.RemoveLink)
 		auth.PUT("/links", s.AddNewLink)
-
 	}
-
-	s.router.GET("/", func(c *gin.Context) {
-		c.HTML(200, "home.tmpl", nil)
-	})
 
 	if s.sec {
 		log.Fatal(autotls.Run(s.router, s.domain))
