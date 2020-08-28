@@ -28,6 +28,7 @@ func main() {
 	mongourl := os.Getenv("MONGODB_URI")
 	redisUrl := os.Getenv("REDIS_URL")
 	domain := os.Getenv("DOMAIN")
+	staticDir := os.Getenv("STATIC")
 
 	if port == "" {
 		log.Fatal("$PORT must be set")
@@ -51,6 +52,13 @@ func main() {
 		}
 	} else {
 		s.sec = false
+	}
+
+	if staticDir == "" {
+		log.Println("Static var not set. Setting as Static")
+		s.static = "Static"
+	} else {
+		s.static = staticDir
 	}
 
 	clientOptions := options.Client().ApplyURI(mongourl)

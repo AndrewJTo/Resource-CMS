@@ -26,6 +26,7 @@ type Server struct {
 	db       *mongo.Database
 	store    redis.Store
 	rootNode *stru.Node
+	static   string
 }
 
 func (s *Server) init() {
@@ -35,30 +36,14 @@ func (s *Server) init() {
 	s.router.Use(gin.Logger())
 	s.router.Use(sessions.Sessions("ressys_sessions", s.store))
 	//s.router.Static("/", "static")
-
-	s.router.Use(static.Serve("/", static.LocalFile("Static", false)))
+	s.router.LoadHTMLGlob(s.static + "/index.html")
+	s.router.Use(static.Serve("/", static.LocalFile(s.static, false)))
+	s.router.NoRoute(func(c *gin.Context) {
+		//c.JSON(200, gin.H{"t":"est"})
+		c.HTML(200, "index.html", nil)
+	})
 
 	s.router.POST("/api/login", s.loginRoute)
-
-	//Counter
-	s.router.GET("/test", func(c *gin.Context) {
-		session := sessions.Default(c)
-		var count int
-		v := session.Get("count")
-		if v == nil {
-			count = 0
-		} else {
-			count = v.(int)
-			count++
-		}
-		session.Set("count", count)
-		err := session.Save()
-		if err != nil {
-			c.JSON(501, gin.H{"error": "Sessin save error!", "count": count})
-		} else {
-			c.JSON(200, gin.H{"count": count})
-		}
-	})
 
 	//TODO: CSRF STUFF HERE
 	auth := s.router.Group("/api")
