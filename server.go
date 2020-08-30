@@ -44,6 +44,7 @@ func (s *Server) init() {
 	})
 
 	s.router.POST("/api/login", s.loginRoute)
+	s.router.GET("/api/site/title", s.GetTitle)
 
 	//TODO: CSRF STUFF HERE
 	auth := s.router.Group("/api")
@@ -64,7 +65,8 @@ func (s *Server) init() {
 		auth.DELETE("/pages/:title", s.RemovePage)
 		auth.GET("/pages/:title", s.GetPage)
 		auth.GET("/groups", s.ListGroups)
-		auth.GET("/files/:path", s.NodePathGet)
+		auth.GET("/files/*path", s.NodePathGet)
+		auth.PUT("/files/*path", s.CreateDir)
 		auth.GET("/links", s.ListLinks)
 		auth.GET("/links/:id", s.GetLink)
 		auth.POST("/links/:id", s.UpdateLink)

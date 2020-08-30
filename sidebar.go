@@ -10,6 +10,22 @@ import (
 	stru "github.com/AndrewJTo/Resource-CMS/structures"
 )
 
+func (s *Server) GetTitle(c *gin.Context) {
+	sideBar, err := s.getSideBar()
+	if err != nil {
+		log.Println("Creating sidebar")
+		sideBar, err = s.makeEmptySideBar()
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"msg": "Could not find the sidebar!"})
+			return
+		}
+	}
+	c.JSON(200, sideBar.Title)
+	return
+
+}
+
 func (s *Server) GetSideBarRoute(c *gin.Context) {
 
 	sideBar, err := s.getSideBar()

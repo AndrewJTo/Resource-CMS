@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"time"
 
 	stru "github.com/AndrewJTo/Resource-CMS/structures"
 	"go.mongodb.org/mongo-driver/bson"
@@ -13,20 +14,30 @@ import (
 
 //Recursively find a node given a path
 func (s *Server) GetNodeFromPath(path string) (stru.Node, error) {
+	log.Println("paht: " + path)
 	pathSplit := strings.Split(path, "/")
+	log.Printf("path size: %d \n", len(pathSplit))
+	return s.GetNodeFromParts(pathSplit)
+}
+
+func (s *Server) GetNodeFromParts(parts []string) (stru.Node, error) {
 	root, err := s.GetRootNode()
 	node := stru.Node{}
 	if err != nil {
 		return node, err
 	}
-	return recursiveNodeFind(s, *root, pathSplit)
+	return recursiveNodeFind(s, *root, parts)
+
 }
 
 func recursiveNodeFind(s *Server, start stru.Node, path []string) (stru.Node, error) {
-	if len(path) == 0 {
+
+	log.Println("Start node: " + start.Title + " type " + start.Type)
+	if len(path) == 1 {
 		return start, nil
 	}
 	target := path[0]
+	log.Println("target: " + target)
 	listing, err := s.GetDirList(start)
 	if err != nil {
 		return start, err
@@ -38,7 +49,6 @@ func recursiveNodeFind(s *Server, start stru.Node, path []string) (stru.Node, er
 		}
 	}
 	return start, errors.New("Not found in dir")
-
 }
 
 //Pass a directory node to this and it will return its child nodes
@@ -49,7 +59,7 @@ func (s *Server) GetDirList(dirNode stru.Node) ([]stru.Node, error) {
 
 	var children []stru.Node
 
-	filter := bson.M{"parent_id": dirNode.Id}
+	filter := bson.M{"parentid": dirNode.Id}
 	cur, err := s.db.Collection("nodes").Find(context.Background(), filter)
 
 	if err != nil {
@@ -81,7 +91,8 @@ func (s *Server) GetRootNode() (*stru.Node, error) {
 	var rootNode stru.Node
 	err := s.db.Collection("nodes").FindOne(context.Background(), filter).Decode(&rootNode)
 	if err != nil {
-		//Generate one
+
+		//Generate node
 		rootNode = stru.Node{
 			Id:        primitive.NewObjectID(),
 			Title:     "",
@@ -93,7 +104,7 @@ func (s *Server) GetRootNode() (*stru.Node, error) {
 				ViewGroupIds:  []primitive.ObjectID{},
 				EditGroupsIds: []primitive.ObjectID{},
 			},
-			Url: "/",
+			Creation: time.Now(),
 		}
 
 		_, err = s.db.Collection("nodes").InsertOne(context.Background(), rootNode)
