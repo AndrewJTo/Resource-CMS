@@ -18,8 +18,7 @@ type Permissions struct {
 }
 
 type Node struct {
-	Id        primitive.ObjectID `json:"-" bson:"_id"`
-	HexId     string             `json:"id" bson"-"`
+	Id        primitive.ObjectID `json:"id" bson:"_id"`
 	Title     string
 	Location  string
 	Type      string
@@ -30,9 +29,6 @@ type Node struct {
 }
 
 type FileObject struct {
-	Name string `json:"file_name" bson:"file_name"`
-	//NodeId primitive.ObjectID `json:"-" bson:"dir"` //object id of parent dir
-	//DirHex string             `json:"dir" bson:"-"`
-	Awskey string `json:"-" bson:"aws_key"`
-	DlUrl  string `json:"download_url" bson:"-"`
+	Name string    `json:"file_name"`
+	Date time.Time `json:"last_modified"`
 }

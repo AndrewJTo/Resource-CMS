@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/gob"
-	"fmt"
 	"log"
 	"os"
 
@@ -29,7 +28,7 @@ func main() {
 	redisUrl := os.Getenv("REDIS_URL")
 	domain := os.Getenv("DOMAIN")
 	staticDir := os.Getenv("STATIC")
-
+	bucketName := os.Getenv("BUCKET")
 	if port == "" {
 		log.Fatal("$PORT must be set")
 	}
@@ -80,16 +79,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-
-	svc := s3.New(sess)
-	result, err := svc.ListBuckets(nil)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	fmt.Println("Buckets:")
-	for _, b := range result.Buckets {
-		fmt.Printf("* %s created on %s\n", aws.StringValue(b.Name), aws.TimeValue(b.CreationDate))
-	}
+	s.s3svc = s3.New(sess)
+	s.bucketName = bucketName
 
 	redisStore, err := redis.NewStore(10, "tcp", redisUrl, "", []byte("secret"))
 	if err != nil {

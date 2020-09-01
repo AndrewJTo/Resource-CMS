@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"path"
 	"strings"
 	"time"
 
@@ -12,43 +13,76 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func recursiveDelete(s *Server, start stru.Node) {
+	if start.Type == "dir" {
+		children, _ := s.GetDirList(start)
+		for _, child := range children {
+			recursiveDelete(s, child)
+		}
+		//We can delete this node now
+		if s.DeleteNode(start) != nil {
+			log.Println("Could not delete node " + start.Title)
+		}
+		return
+	}
+	if s.DeleteNode(start) != nil {
+		log.Println("Could not delete node " + start.Title)
+	}
+}
+
+func (s *Server) DeleteNode(node stru.Node) error {
+	filter := bson.M{"_id": node.Id}
+	_, err := s.db.Collection("nodes").DeleteOne(context.Background(), filter)
+	return err
+}
+
 //Recursively find a node given a path
-func (s *Server) GetNodeFromPath(path string) (stru.Node, error) {
-	log.Println("paht: " + path)
-	pathSplit := strings.Split(path, "/")
-	log.Printf("path size: %d \n", len(pathSplit))
-	return s.GetNodeFromParts(pathSplit)
-}
-
-func (s *Server) GetNodeFromParts(parts []string) (stru.Node, error) {
+func (s *Server) GetNodeFromPath(fPath string) (stru.Node, error) {
+	dir, file := path.Split(fPath)
+	//Split dir into parts, excluding first
+	parts := strings.Split(dir, "/")[1:]
 	root, err := s.GetRootNode()
-	node := stru.Node{}
 	if err != nil {
-		return node, err
+		return *root, err
 	}
-	return recursiveNodeFind(s, *root, parts)
 
+	return recursiveNodeFind(s, *root, parts, file)
 }
 
-func recursiveNodeFind(s *Server, start stru.Node, path []string) (stru.Node, error) {
-
-	log.Println("Start node: " + start.Title + " type " + start.Type)
-	if len(path) == 1 {
-		return start, nil
+func recursiveNodeFind(s *Server, start stru.Node, path []string, target string) (stru.Node, error) {
+	log.Printf("Recursion:- START: '%s', PATH: %q, TARGET: '%s'", start.Title, path, target)
+	if path[0] == "" {
+		//We have reached the directory we are looking for
+		if target == "" {
+			//We want a dir listing
+			return start, nil
+		}
+		//Return a child node of this directory
+		children, err := s.GetDirList(start) //Get dir listing
+		if err != nil {
+			return start, err
+		}
+		for _, child := range children { //Loop through child nodes
+			if strings.EqualFold(target, child.Title) {
+				return child, nil
+			}
+		}
+		//The file has not been found, return error
+		return start, errors.New("File not found!")
 	}
-	target := path[0]
-	log.Println("target: " + target)
-	listing, err := s.GetDirList(start)
+	//We are looking for a subdir of the curent dir
+	children, err := s.GetDirList(start)
 	if err != nil {
 		return start, err
 	}
-	//Loop through and find the target
-	for _, n := range listing {
-		if n.Title == target {
-			return recursiveNodeFind(s, n, path[1:])
+	log.Printf("Getting dir list: %q\n", children)
+	for _, child := range children { //Loop through children
+		if strings.EqualFold(path[0], child.Title) {
+			return recursiveNodeFind(s, child, path[1:], target) //Step down into dir
 		}
 	}
-	return start, errors.New("Not found in dir")
+	//dir not found
+	return start, errors.New("A parent dir was not found")
 }
 
 //Pass a directory node to this and it will return its child nodes

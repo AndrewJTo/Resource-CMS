@@ -6,6 +6,7 @@ import (
 	"time"
 
 	stru "github.com/AndrewJTo/Resource-CMS/structures"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-contrib/static"
@@ -19,14 +20,16 @@ import (
 )
 
 type Server struct {
-	domain   string
-	port     string
-	sec      bool
-	router   *gin.Engine
-	db       *mongo.Database
-	store    redis.Store
-	rootNode *stru.Node
-	static   string
+	domain     string
+	port       string
+	sec        bool
+	router     *gin.Engine
+	db         *mongo.Database
+	store      redis.Store
+	rootNode   *stru.Node
+	static     string
+	bucketName string
+	s3svc      *s3.S3
 }
 
 func (s *Server) init() {
@@ -66,7 +69,8 @@ func (s *Server) init() {
 		auth.GET("/pages/:title", s.GetPage)
 		auth.GET("/groups", s.ListGroups)
 		auth.GET("/files/*path", s.NodePathGet)
-		auth.PUT("/files/*path", s.CreateDir)
+		auth.PUT("/files/*path", s.CreateObj)
+		auth.DELETE("/files/*path", s.DeleteObj)
 		auth.GET("/links", s.ListLinks)
 		auth.GET("/links/:id", s.GetLink)
 		auth.POST("/links/:id", s.UpdateLink)
