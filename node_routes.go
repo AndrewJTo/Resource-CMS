@@ -25,14 +25,14 @@ func (s *Server) DeleteObj(c *gin.Context) {
 	fPath = path.Clean(fPath)
 	node, err := s.GetNodeFromPath(fPath)
 	if err != nil {
+		c.JSON(404, gin.H{"success": false, "path": fPath, "msg": err.Error()})
+		return
+	}
+	if node.Type == "s3_file" {
 		//Try s3
-		log.Println("Look on s3:" + fPath)
-		_, err = s.s3svc.DeleteObject(&s3.DeleteObjectInput{
-			Bucket: aws.String(s.bucketName),
-			Key:    aws.String(strings.TrimLeft(fPath, "/")),
-		})
+		err := s.DeleteNode(node)
 		if err != nil {
-			c.JSON(404, gin.H{"success": false, "path": fPath, "msg": err.Error()})
+			c.JSON(500, gin.H{"success": false, "error": "Could not delete s3 object: " + err.Error()})
 			return
 		}
 		c.JSON(200, gin.H{"success": true, "msg": "Deleted s3 Object"})
@@ -54,13 +54,18 @@ func (s *Server) NodePathGet(c *gin.Context) {
 	node, err := s.GetNodeFromPath(fPath)
 
 	if err != nil {
+		c.JSON(404, gin.H{"success": false, "msg": "File not found"})
+		return
+	}
+
+	if node.Type == "s3_file" {
 		//Try s3
 		_, err := s.s3svc.HeadObject(&s3.HeadObjectInput{
 			Bucket: aws.String(s.bucketName),
 			Key:    aws.String(strings.TrimLeft(fPath, "/")),
 		})
 		if err != nil {
-			c.JSON(404, gin.H{"path": fPath, "msg": err.Error()})
+			c.JSON(404, gin.H{"success": false, "path": fPath, "msg": err.Error()})
 			return
 		}
 		req, _ := s.s3svc.GetObjectRequest(&s3.GetObjectInput{
@@ -69,7 +74,7 @@ func (s *Server) NodePathGet(c *gin.Context) {
 		})
 		urlStr, err := req.Presign(15 * time.Minute)
 		if err != nil {
-			c.JSON(500, gin.H{"path": fPath, "msg": err.Error()})
+			c.JSON(500, gin.H{"success": false, "path": fPath, "msg": err.Error()})
 			return
 		}
 		c.JSON(200, gin.H{"success": true, "msg": urlStr})
@@ -83,33 +88,7 @@ func (s *Server) NodePathGet(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"path": fPath, "msg": err.Error()})
 			return
 		}
-		//get s3 listing
-		log.Println("->fPath: '" + fPath + "'")
-		var input *s3.ListObjectsV2Input
-		//if fPath == ""
-		input = &s3.ListObjectsV2Input{
-			Bucket:    aws.String(s.bucketName),
-			MaxKeys:   aws.Int64(128),
-			Prefix:    aws.String(fPath),
-			Delimiter: aws.String("/"),
-		}
-		if fPath != "/" {
-			input.Prefix = aws.String(strings.TrimLeft(fPath, "/") + "/")
-		} else {
-			input.Prefix = aws.String("")
-		}
-		res, err := s.s3svc.ListObjectsV2(input)
-		if err != nil {
-			c.JSON(404, gin.H{"success": false, "msg": "s3 err: " + err.Error()})
-			return
-		}
-		log.Println(res)
-		//Only send back synopsis of s3 objects
-		var objs []stru.FileObject
-		for _, s3Obj := range res.Contents {
-			objs = append(objs, stru.FileObject{Name: path.Base(*s3Obj.Key), Date: *s3Obj.LastModified})
-		}
-		c.JSON(200, gin.H{"node": node, "children": children, "s3": objs})
+		c.JSON(200, gin.H{"node": node, "children": children})
 		return
 	} else {
 		c.JSON(200, gin.H{"node": node})
@@ -152,6 +131,33 @@ func (s *Server) CreateObj(c *gin.Context) {
 			c.JSON(500, gin.H{"success": false, "msg": err.Error()})
 			return
 		}
+		//Creat DB entry
+		parentDir, err := s.GetNodeFromPath(dir)
+		if err != nil {
+			c.JSON(404, gin.H{"success": false, "msg": "Parent dir not found: " + err.Error()})
+			return
+		}
+		newNode := stru.Node{
+			Id:        primitive.NewObjectID(),
+			Title:     file,
+			Location:  dir,
+			Type:      "s3_file",
+			ContentId: primitive.ObjectID{},
+			ParentId:  parentDir.Id,
+			Url:       fPath,
+			Access: stru.Permissions{
+				AllUsersView:  true,
+				ViewGroupIds:  []primitive.ObjectID{},
+				EditGroupsIds: []primitive.ObjectID{},
+			},
+			Creation: time.Now(),
+		}
+		_, err = s.db.Collection("nodes").InsertOne(context.Background(), newNode)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "msg": "Could not insert new node data"})
+			return
+		}
 		c.JSON(200, gin.H{"success": true, "msg": str})
 		return
 	}
@@ -189,6 +195,7 @@ func (s *Server) CreateDir(c *gin.Context, dir, file, fPath string) {
 		Type:      "dir",
 		ContentId: primitive.ObjectID{},
 		ParentId:  node.Id,
+		Url:       dir + file,
 		Access: stru.Permissions{
 			AllUsersView:  true,
 			ViewGroupIds:  []primitive.ObjectID{},

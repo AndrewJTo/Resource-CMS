@@ -22,6 +22,7 @@ type Node struct {
 	Title     string
 	Location  string
 	Type      string
+	Url       string
 	ContentId primitive.ObjectID `json:"content_id", bson:"content_id"`
 	ParentId  primitive.ObjectID `json:"parent_id", bson:"parent_id"`
 	Access    Permissions        `json:"-", bson:"permissions"`

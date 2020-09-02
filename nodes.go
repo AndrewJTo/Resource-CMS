@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"log"
 	"path"
 	"strings"
@@ -31,9 +33,29 @@ func recursiveDelete(s *Server, start stru.Node) {
 }
 
 func (s *Server) DeleteNode(node stru.Node) error {
+
+	if node.Type == "s3_file" {
+		err := s.DeleteS3Obj(node)
+		if err != nil {
+			return err
+		}
+	}
 	filter := bson.M{"_id": node.Id}
 	_, err := s.db.Collection("nodes").DeleteOne(context.Background(), filter)
 	return err
+}
+
+func (s *Server) DeleteS3Obj(n stru.Node) error {
+	key := strings.TrimLeft(n.Url, "/")
+	log.Println("Look on s3:" + key)
+	_, err := s.s3svc.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(s.bucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 //Recursively find a node given a path
@@ -50,7 +72,7 @@ func (s *Server) GetNodeFromPath(fPath string) (stru.Node, error) {
 }
 
 func recursiveNodeFind(s *Server, start stru.Node, path []string, target string) (stru.Node, error) {
-	log.Printf("Recursion:- START: '%s', PATH: %q, TARGET: '%s'", start.Title, path, target)
+	//log.Printf("Recursion:- START: '%s', PATH: %q, TARGET: '%s'", start.Title, path, target)
 	if path[0] == "" {
 		//We have reached the directory we are looking for
 		if target == "" {
@@ -75,7 +97,7 @@ func recursiveNodeFind(s *Server, start stru.Node, path []string, target string)
 	if err != nil {
 		return start, err
 	}
-	log.Printf("Getting dir list: %q\n", children)
+	//log.Printf("Getting dir list: %q\n", children)
 	for _, child := range children { //Loop through children
 		if strings.EqualFold(path[0], child.Title) {
 			return recursiveNodeFind(s, child, path[1:], target) //Step down into dir
