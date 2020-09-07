@@ -76,6 +76,11 @@ func (s *Server) init() {
 		auth.POST("/links/:id", s.UpdateLink)
 		auth.DELETE("/links/:id", s.RemoveLink)
 		auth.PUT("/links", s.AddNewLink)
+		auth.GET("/events", s.ListEvents)
+		auth.PUT("/events", s.CreateEvent)
+		auth.GET("/events/:event", s.GetEvent)
+		auth.POST("/events/:event", s.UpdateEvent)
+		auth.DELETE("/events/:event", s.DeleteEvent)
 	}
 
 	if s.sec {
